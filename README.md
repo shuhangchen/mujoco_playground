@@ -32,9 +32,9 @@ pip install playground
 2. [Install uv](https://docs.astral.sh/uv/getting-started/installation/), a faster alternative to `pip`
 3. Create a virtual environment: `uv venv --python 3.11`
 4. Activate it: `source .venv/bin/activate`
-5. Install CUDA 12 jax: `uv pip install -U "jax[cuda12]"`
-    * Verify GPU backend: `python -c "import jax; print(jax.default_backend())"` should print gpu
-6. Install playground: `uv pip install -e ".[all]"`
+5. Install CUDA 12 jax: `uv pip install -U "jax[cuda12]==0.6.0"`
+   - Verify GPU backend: `python -c "import jax; print(jax.default_backend())"` should print gpu
+6. Install playground: `uv pip install -e ".[all]"` and run `uv add "jax[cuda12]==0.6.0"` and `uv sync`
 7. Verify installation (and download Menagerie): `python -c "import mujoco_playground"`
 
 #### Madrona-MJX (optional)
@@ -44,25 +44,27 @@ For vision-based environments, please refer to the installation instructions in 
 ## Getting started
 
 ### Basic Tutorials
-| Colab | Description |
-|-------|-------------|
+
+| Colab                                                                                                                                                                                                        | Description                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google-deepmind/mujoco_playground/blob/main/learning/notebooks/dm_control_suite.ipynb) | Introduction to the Playground with DM Control Suite |
-| [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google-deepmind/mujoco_playground/blob/main/learning/notebooks/locomotion.ipynb) | Locomotion Environments |
-| [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google-deepmind/mujoco_playground/blob/main/learning/notebooks/manipulation.ipynb) | Manipulation Environments |
+| [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google-deepmind/mujoco_playground/blob/main/learning/notebooks/locomotion.ipynb)       | Locomotion Environments                              |
+| [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google-deepmind/mujoco_playground/blob/main/learning/notebooks/manipulation.ipynb)     | Manipulation Environments                            |
 
 ### Vision-Based Tutorials (GPU Colab)
-| Colab | Description |
-|-------|-------------|
+
+| Colab                                                                                                                                                                                                            | Description                                 |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google-deepmind/mujoco_playground/blob/main/learning/notebooks/training_vision_1_t4.ipynb) | Training CartPole from Vision (T4 Instance) |
 
 ### Local Runtime Tutorials
-*Requires local Madrona-MJX installation*
 
-| Colab | Description |
-|-------|-------------|
-| [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google-deepmind/mujoco_playground/blob/main/learning/notebooks/training_vision_1.ipynb) | Training CartPole from Vision |
+_Requires local Madrona-MJX installation_
+
+| Colab                                                                                                                                                                                                         | Description                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google-deepmind/mujoco_playground/blob/main/learning/notebooks/training_vision_1.ipynb) | Training CartPole from Vision    |
 | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google-deepmind/mujoco_playground/blob/main/learning/notebooks/training_vision_2.ipynb) | Robotic Manipulation from Vision |
-
 
 ## FAQ
 
@@ -71,6 +73,7 @@ For vision-based environments, please refer to the installation instructions in 
 Get started by installing the library and exploring its features! Found a bug? Report it in the issue tracker. Interested in contributing? If you are a developer with robotics experience, we would love your help—check out the [contribution guidelines](CONTRIBUTING.md) for more details.
 
 ### Reproducibility / GPU Precision Issues
+
 Users with NVIDIA Ampere architecture GPUs (e.g., RTX 30 and 40 series) may experience reproducibility [issues](https://github.com/google-deepmind/mujoco_playground/issues/86) in mujoco_playground due to JAX’s default use of TF32 for matrix multiplications. This lower precision can adversely affect RL training stability. To ensure consistent behavior with systems using full float32 precision (as on Turing GPUs), please run `export JAX_DEFAULT_MATMUL_PRECISION=highest` in your terminal before starting your experiments (or add it to the end of `~/.bashrc`).
 
 ## Citation
