@@ -30,12 +30,15 @@ pip install playground
 
 1. `git clone git@github.com:google-deepmind/mujoco_playground.git && cd mujoco_playground`
 2. [Install uv](https://docs.astral.sh/uv/getting-started/installation/), a faster alternative to `pip`
-3. Create a virtual environment: `uv venv --python 3.11`
+3. Create a virtual environment: `uv venv --python 3.12`
 4. Activate it: `source .venv/bin/activate`
 5. Install CUDA 12 jax: `uv pip install -U "jax[cuda12]==0.6.0"`
-   - Verify GPU backend: `python -c "import jax; print(jax.default_backend())"` should print gpu
-6. Install playground: `uv pip install -e ".[all]"` and run `uv add "jax[cuda12]==0.6.0"` and `uv sync`
+   - Verify GPU backend: `uv python -c "import jax; print(jax.default_backend())"` should print gpu
+6. Install playground: `uv pip install -e ".[all]"` (jax_cuda12_plugin=0.6.2 will result in error)
 7. Verify installation (and download Menagerie): `python -c "import mujoco_playground"`
+
+
+
 
 #### Madrona-MJX (optional)
 
@@ -97,3 +100,9 @@ The texture used in the rough terrain for the locomotion environments is from [P
 All other content in this repository is licensed under the Apache License, Version 2.0. A copy of this license is provided in the top-level [LICENSE](LICENSE) file in this repository. You can also obtain it from https://www.apache.org/licenses/LICENSE-2.0.
 
 This is not an officially supported Google product.
+
+
+## issues
+
+cusolver internal error:
+```unset CUDA_PATH && unset LD_LIBRARY_PATH``` befor running jax code
