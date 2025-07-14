@@ -33,12 +33,9 @@ pip install playground
 3. Create a virtual environment: `uv venv --python 3.12`
 4. Activate it: `source .venv/bin/activate`
 5. Install CUDA 12 jax: `uv pip install -U "jax[cuda12]==0.6.0"`
-   - Verify GPU backend: `uv python -c "import jax; print(jax.default_backend())"` should print gpu
+   - Verify GPU backend: `uv run python -c "import jax; print(jax.default_backend())"` should print gpu
 6. Install playground: `uv pip install -e ".[all]"` (jax_cuda12_plugin=0.6.2 will result in error)
 7. Verify installation (and download Menagerie): `python -c "import mujoco_playground"`
-
-
-
 
 #### Madrona-MJX (optional)
 
@@ -101,8 +98,7 @@ All other content in this repository is licensed under the Apache License, Versi
 
 This is not an officially supported Google product.
 
-
 ## issues
 
 cusolver internal error:
-```unset CUDA_PATH && unset LD_LIBRARY_PATH``` befor running jax code
+`unset CUDA_PATH && unset LD_LIBRARY_PATH` befor running jax code
