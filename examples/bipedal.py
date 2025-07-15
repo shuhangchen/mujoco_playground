@@ -180,4 +180,5 @@ frames = eval_env.render(
     height=480,
     modify_scene_fns=mod_fns,
 )
-media.show_video(frames, fps=fps, loop=False)
+media.write_video("bipedal_rollout.mp4", frames, fps=fps)
+print("Video saved as bipedal_rollout.mp4")

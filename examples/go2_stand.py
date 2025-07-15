@@ -102,6 +102,8 @@ def policy_params_fn(current_step, make_policy, params):
   path = ckpt_path / f"{current_step}"
   orbax_checkpointer.save(path, params, force=True, save_args=save_args)
 
+plt.ion()
+plt.figure(figsize=(10, 6))
 
 def progress(num_steps, metrics):
   clear_output(wait=True)
@@ -116,8 +118,8 @@ def progress(num_steps, metrics):
   plt.ylabel("reward per episode")
   plt.title(f"y={y_data[-1]:.3f}")
   plt.errorbar(x_data, y_data, yerr=y_dataerr, color="blue")
-
-  display(plt.gcf())
+  plt.draw()
+  plt.pause(0.001)
 
 randomizer = registry.get_domain_randomizer(env_name)
 ppo_training_params = dict(ppo_params)
@@ -203,7 +205,8 @@ scene_option.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = False
 frames = eval_env.render(
     traj, camera="side", scene_option=scene_option, height=480, width=640
 )
-media.show_video(frames, fps=fps, loop=False)
+media.write_video("go2_stand_rollout.mp4", frames, fps=fps)
+print("Video saved as go2_stand_rollout.mp4")
 
 power = jp.array(power1)
 print(f"Max power: {jp.max(power)}")
@@ -294,7 +297,11 @@ scene_option.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = False
 frames = eval_env.render(
     traj, camera="side", scene_option=scene_option, height=480, width=640
 )
-media.show_video(frames, fps=fps, loop=False)
+media.write_video("go2_stand_rollout_finetune.mp4", frames, fps=fps)
+print("Video saved as go2_stand_rollout_finetune.mp4")
 
 power = jp.array(power1)
 print(f"Max power: {jp.max(power)}")
+
+plt.ioff()
+input("Press Enter to close all plots and exit...")
