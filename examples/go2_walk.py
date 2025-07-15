@@ -58,7 +58,7 @@ from brax.training.agents.sac import train as sac
 from etils import epath
 from flax import struct
 from flax.training import orbax_utils
-from IPython.display import HTML, clear_output
+
 import jax
 from jax import numpy as jp
 from matplotlib import pyplot as plt
@@ -86,22 +86,25 @@ registry.get_domain_randomizer(env_name)
 x_data, y_data, y_dataerr = [], [], []
 times = [datetime.now()]
 
+# Enable interactive mode for real-time plotting
+plt.ion()
+plt.figure(figsize=(10, 6))
 
 def progress(num_steps, metrics):
-  clear_output(wait=True)
-
   times.append(datetime.now())
   x_data.append(num_steps)
   y_data.append(metrics["eval/episode_reward"])
   y_dataerr.append(metrics["eval/episode_reward_std"])
 
+  plt.clf()  # Clear the current figure
   plt.xlim([0, ppo_params["num_timesteps"] * 1.25])
   plt.xlabel("# environment steps")
   plt.ylabel("reward per episode")
   plt.title(f"y={y_data[-1]:.3f}")
   plt.errorbar(x_data, y_data, yerr=y_dataerr, color="blue")
 
-  display(plt.gcf())
+  plt.draw()
+  plt.pause(0.001)  # Brief pause to allow plot to update
 
 randomizer = registry.get_domain_randomizer(env_name)
 ppo_training_params = dict(ppo_params)
@@ -253,7 +256,8 @@ frames = eval_env.render(
     height=480,
     modify_scene_fns=mod_fns,
 )
-media.show_video(frames, fps=fps, loop=False)
+media.write_video("go2_walk_rollout.mp4", frames, fps=fps)
+print("Video saved as go2_walk_rollout.mp4")
 
 
 #@title Plot each foot in a 2x2 grid.
@@ -270,7 +274,7 @@ for i, ax in enumerate(axs.flat):
   ax.set_xlabel("time")
   ax.set_ylabel("height")
 plt.tight_layout()
-plt.show()
+plt.show(block=False)
 
 linvel_x = jp.array(linvel)[:, 0]
 linvel_y = jp.array(linvel)[:, 1]
@@ -361,7 +365,7 @@ for i, ax in enumerate(axs.flat):
   ax.set_xlabel("time")
   ax.set_ylabel("height")
 plt.tight_layout()
-plt.show()
+plt.show(block=False)
 
 linvel_x = jp.array(linvel)[:, 0]
 linvel_y = jp.array(linvel)[:, 1]
@@ -417,4 +421,9 @@ frames = eval_env.render(
     modify_scene_fns=mod_fns,
     scene_option=scene_option,
 )
-media.show_video(frames, fps=fps, loop=False)
+media.write_video("go2_walk_speed_test.mp4", frames, fps=fps)
+print("Video saved as go2_walk_speed_test.mp4")
+
+# Keep all plots visible after program exits
+plt.ioff()  # Turn off interactive mode
+input("Press Enter to close all plots and exit...")
