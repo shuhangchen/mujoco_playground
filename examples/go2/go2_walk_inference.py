@@ -46,15 +46,43 @@ env_name = 'Go2JoystickFlatTerrain'
 checkpoint_dir = os.path.abspath("./output/checkpoints/go2/walk")
 checkpoint_path = os.path.join(checkpoint_dir, "latest")
 
-# load checkpoint
-params = ocp.restore(checkpoint_path)
+# Get environment configuration
+env_cfg = registry.get_default_config(env_name)
 
+# Create inference function
+from mujoco_playground.config import locomotion_params
+ppo_params = locomotion_params.brax_ppo_config(env_name)
+network_factory = ppo_networks.make_ppo_networks
+if "network_factory" in ppo_params:
+    network_factory = functools.partial(
+        ppo_networks.make_ppo_networks,
+        **ppo_params.network_factory
+    )
 
+# Create the inference function using the same setup as training
+env = registry.load(env_name)
+eval_env = registry.load(env_name, config=env_cfg)
 
+# Create networks with the same configuration as training
+# Use the unwrapped environment to avoid vectorization issues
+rng = jax.random.PRNGKey(0)
+dummy_state = env.reset(rng)
+dummy_obs = dummy_state.obs
+networks = network_factory(env.observation_size, env.action_size, preprocess_observations_fn=lambda x, y: x)
+make_inference_fn = ppo_networks.make_inference_fn(networks)
+
+# Load checkpoint using the same method as training
+checkpointer = ocp.StandardCheckpointer()
+if not os.path.exists(checkpoint_path):
+    raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}. Please run the training script first.")
+
+# Restore checkpoint
+params = checkpointer.restore(checkpoint_path)
+print(f"Checkpoint loaded from {checkpoint_path}")
+print("Creating inference function...")
 
 # policy evaluation
 # Enable perturbation in the eval env.
-env_cfg = registry.get_default_config(env_name)
 env_cfg.pert_config.enable = True
 env_cfg.pert_config.velocity_kick = [3.0, 6.0]
 env_cfg.pert_config.kick_wait_times = [5.0, 15.0]

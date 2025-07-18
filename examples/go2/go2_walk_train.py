@@ -152,14 +152,24 @@ make_inference_fn, params, metrics = train_fn(
 print(f"time to jit: {times[1] - times[0]}")
 print(f"time to train: {times[-1] - times[1]}")
 
-# Save the trained model
+# Save the trained model and configuration
 checkpoint_dir = os.path.abspath("./output/checkpoints/go2/walk")
 os.makedirs(checkpoint_dir, exist_ok=True)
 checkpointer = ocp.StandardCheckpointer()
 save_args = orbax_utils.save_args_from_target(params)
 checkpoint_path = os.path.join(checkpoint_dir, "latest")
-checkpointer.save(checkpoint_path, params, save_args=save_args)
+checkpointer.save(checkpoint_path, params, save_args=save_args, force=True)
 print(f"Model saved to {checkpoint_path}")
+
+# Save the configuration and metadata for inference
+import json
+config_data = {
+    'env_name': env_name,
+    'ppo_params': convert_to_serializable(ppo_params),
+    'env_cfg': convert_to_serializable(env_cfg)
+}
+with open(os.path.join(checkpoint_dir, 'config.json'), 'w') as f:
+    json.dump(config_data, f, indent=2)
 
 # Wait for all background checkpoint operations to complete
 checkpointer.wait_until_finished()
