@@ -1,6 +1,7 @@
 import os
-import subprocess
-
+import json
+import functools
+from datetime import datetime
 
 # Configure MuJoCo to use the EGL rendering backend (requires GPU)
 print('Setting environment variable to use GPU rendering:')
@@ -9,7 +10,6 @@ os.environ['MUJOCO_GL'] = 'egl'
 try:
   print('Checking that the installation succeeded:')
   import mujoco
-
   mujoco.MjModel.from_xml_string('<mujoco/>')
 except Exception as e:
   raise e from RuntimeError(
@@ -26,111 +26,30 @@ xla_flags = os.environ.get('XLA_FLAGS', '')
 xla_flags += ' --xla_gpu_triton_gemm_any=True'
 os.environ['XLA_FLAGS'] = xla_flags
 
-import json
-import itertools
-import time
-from typing import Callable, List, NamedTuple, Optional, Union
 import numpy as np
-
-# Graphics and plotting.
-import mediapy as media
 import matplotlib.pyplot as plt
-
-# More legible printing from numpy.
-np.set_printoptions(precision=3, suppress=True, linewidth=100)
-
-from datetime import datetime
-import functools
-import os
-from typing import Any, Dict, Sequence, Tuple, Union
-from brax import base
-from brax import envs
-from brax import math
-from brax.base import Base, Motion, Transform
-from brax.base import State as PipelineState
-from brax.envs.base import Env, PipelineEnv, State
-from brax.io import html, mjcf, model
-from brax.mjx.base import State as MjxState
-from brax.training.agents.ppo import networks as ppo_networks
-from brax.training.agents.ppo import train as ppo
-from brax.training.agents.sac import networks as sac_networks
-from brax.training.agents.sac import train as sac
-from etils import epath
-from flax import struct
-from flax.training import orbax_utils
-
-import jax
-from jax import numpy as jp
-from matplotlib import pyplot as plt
 import mediapy as media
-from ml_collections import config_dict
 import mujoco
 from mujoco import mjx
-import numpy as np
+import jax
+from jax import numpy as jp
 from orbax import checkpoint as ocp
+from flax.training import orbax_utils
+from brax.training.agents.ppo import networks as ppo_networks
 
 from mujoco_playground import wrapper
 from mujoco_playground import registry
+from mujoco_playground._src.gait import draw_joystick_command
 
-print(f"locomotion env {registry.locomotion.ALL_ENVS}")
-
+# load checkpoint
 env_name = 'Go2JoystickFlatTerrain'
-env = registry.load(env_name)
-env_cfg = registry.get_default_config(env_name)
+checkpoint_dir = os.path.abspath("./output/checkpoints/go2/walk")
+checkpoint_path = os.path.join(checkpoint_dir, "latest")
 
-from mujoco_playground.config import locomotion_params
-ppo_params = locomotion_params.brax_ppo_config(env_name)
-
-registry.get_domain_randomizer(env_name)
-
-x_data, y_data, y_dataerr = [], [], []
-times = [datetime.now()]
-
-# Enable interactive mode for real-time plotting
-plt.ion()
-plt.figure(figsize=(10, 6))
-
-def progress(num_steps, metrics):
-  times.append(datetime.now())
-  x_data.append(num_steps)
-  y_data.append(metrics["eval/episode_reward"])
-  y_dataerr.append(metrics["eval/episode_reward_std"])
-
-  plt.clf()  # Clear the current figure
-  plt.xlim([0, ppo_params["num_timesteps"] * 1.25])
-  plt.xlabel("# environment steps")
-  plt.ylabel("reward per episode")
-  plt.title(f"y={y_data[-1]:.3f}")
-  plt.errorbar(x_data, y_data, yerr=y_dataerr, color="blue")
-
-  plt.draw()
-  plt.pause(0.001)  # Brief pause to allow plot to update
-
-randomizer = registry.get_domain_randomizer(env_name)
-ppo_training_params = dict(ppo_params)
-network_factory = ppo_networks.make_ppo_networks
-if "network_factory" in ppo_params:
-  del ppo_training_params["network_factory"]
-  network_factory = functools.partial(
-      ppo_networks.make_ppo_networks,
-      **ppo_params.network_factory
-  )
-
-train_fn = functools.partial(
-    ppo.train, **dict(ppo_training_params),
-    network_factory=network_factory,
-    randomization_fn=randomizer,
-    progress_fn=progress
-)
+# load checkpoint
+params = ocp.restore(checkpoint_path)
 
 
-make_inference_fn, params, metrics = train_fn(
-    environment=env,
-    eval_env=registry.load(env_name, config=env_cfg),
-    wrap_env_fn=wrapper.wrap_for_brax_training,
-)
-print(f"time to jit: {times[1] - times[0]}")
-print(f"time to train: {times[-1] - times[1]}")
 
 
 # policy evaluation
@@ -149,7 +68,7 @@ jit_step = jax.jit(eval_env.step)
 jit_inference_fn = jax.jit(make_inference_fn(params, deterministic=True))
 
 
-#@title Rollout and Render
+# Rollout and Render
 from mujoco_playground._src.gait import draw_joystick_command
 
 x_vel = 0.0  #@param {type: "number"}
@@ -201,6 +120,9 @@ for i in range(env_cfg.episode_length):
       {k: v for k, v in state.metrics.items() if k.startswith("reward/")}
   )
   rollout.append(state)
+  print(f"{i}-th step state: {state}")
+  print(f"{i}-th step state.obs: {state.obs}")
+  print(f"{i}-th step ctrl: {ctrl}")
   swing_peak.append(state.info["swing_peak"])
   rewards.append(
       {k[7:]: v for k, v in state.metrics.items() if k.startswith("reward/")}
@@ -260,7 +182,7 @@ media.write_video("go2_walk_rollout.mp4", frames, fps=fps)
 print("Video saved as go2_walk_rollout.mp4")
 
 
-#@title Plot each foot in a 2x2 grid.
+# Plot each foot in a 2x2 grid.
 
 swing_peak = jp.array(swing_peak)
 names = ["FR", "FL", "RR", "RL"]
@@ -309,7 +231,7 @@ for i, ax in enumerate(axes):
 
 
 
-#@title Slowly increase linvel commands
+# Slowly increase linvel commands
 
 rng = jax.random.PRNGKey(0)
 rollout = []
@@ -333,6 +255,9 @@ for i in range(1_400):
   act_rng, rng = jax.random.split(rng)
   ctrl, _ = jit_inference_fn(state.obs, act_rng)
   state = jit_step(state, ctrl)
+  print(f"{i}-th step state: {state}")
+  print(f"{i}-th step state.obs: {state.obs}")
+  print(f"{i}-th step ctrl: {ctrl}")
   rollout.append(state)
   swing_peak.append(state.info["swing_peak"])
   linvel.append(env.get_global_linvel(state.data))
