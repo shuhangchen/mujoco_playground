@@ -32,7 +32,7 @@ pip install playground
 2. [Install uv](https://docs.astral.sh/uv/getting-started/installation/), a faster alternative to `pip`
 3. Create a virtual environment: `uv venv --python 3.12`
 4. Activate it: `source .venv/bin/activate`
-5. Install CUDA 12 jax: `uv pip install -U "jax[cuda12]==0.6.0"`
+5. Install CUDA 12 jax: `uv pip install -U "jax[cuda12_local]<0.6.0"`
    - Verify GPU backend: `uv run python -c "import jax; print(jax.default_backend())"` should print gpu
 6. Install playground: `uv pip install -e ".[all]"` (jax_cuda12_plugin=0.6.2 will result in error)
 7. Verify installation (and download Menagerie): `python -c "import mujoco_playground"`
@@ -100,5 +100,7 @@ This is not an officially supported Google product.
 
 ## issues
 
-cusolver internal error:
+cusolver internal error with customized cuda:
 `unset CUDA_PATH && unset LD_LIBRARY_PATH` befor running jax code
+
+to run code with mjx, you also need to provide those two commands

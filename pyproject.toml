@@ -12,6 +12,7 @@ dependencies = [
     "ml_collections",
     "mujoco-mjx==3.2.7",
     "mujoco==3.2.7",
+    "rerun-sdk",
     "tqdm",
 ]
 name = "playground"

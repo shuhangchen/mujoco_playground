@@ -15,6 +15,7 @@
 """Joystick task for Go2."""
 
 from typing import Any, Dict, Optional, Union
+import warnings
 
 import jax
 import jax.numpy as jp
@@ -27,6 +28,18 @@ from mujoco_playground._src import collision
 from mujoco_playground._src import mjx_env
 from mujoco_playground._src.locomotion.go2 import base as go2_base
 from mujoco_playground._src.locomotion.go2 import go2_constants as consts
+
+
+def default_vision_config() -> config_dict.ConfigDict:
+  return config_dict.create(
+      gpu_id=0,
+      render_batch_size=1024,
+      render_width=64,
+      render_height=64,
+      enabled_geom_groups=[0, 1, 2],
+      use_rasterizer=False,  # Use raytracer for better quality
+      history=3,  # Stack 3 frames for temporal context
+  )
 
 
 def default_config() -> config_dict.ConfigDict:
@@ -90,6 +103,8 @@ def default_config() -> config_dict.ConfigDict:
           # Probability of not zeroing out new command.
           b=[0.9, 0.25, 0.5],
       ),
+      vision=False,
+      vision_config=default_vision_config(),
   )
 
 
@@ -107,6 +122,12 @@ class Joystick(go2_base.Go2Env):
         config=config,
         config_overrides=config_overrides,
     )
+    
+    # Initialize madrona renderer for vision
+    self._vision = self._config.vision
+    if self._vision:
+      self._init_vision()
+    
     self._post_init()
 
   def _post_init(self) -> None:
@@ -141,6 +162,52 @@ class Joystick(go2_base.Go2Env):
 
     self._cmd_a = jp.array(self._config.command_config.a)
     self._cmd_b = jp.array(self._config.command_config.b)
+
+  def _init_vision(self) -> None:
+    """Initialize madrona renderer for vision-based training."""
+    try:
+      # Import renderer and visualizer GPU state helper
+      from madrona_mjx.renderer import BatchRenderer
+      from madrona_mjx.viz import VisualizerGPUState
+    except ImportError:
+      warnings.warn("Madrona MJX not installed. Cannot use vision with Go2.")
+      return
+
+    # Set up a GPU context for the Madrona renderer via a dummy window
+    viz_state = VisualizerGPUState(
+        self._config.vision_config.render_width,
+        self._config.vision_config.render_height,
+        self._config.vision_config.gpu_id,
+    )
+    viz_gpu_hdls = viz_state.get_gpu_handles()
+    # retain state to keep GPU context alive
+    self._viz_state = viz_state
+
+    # Find front_camera index
+    front_camera_id = None
+    for i in range(self._mj_model.ncam):
+      if self._mj_model.camera(i).name == "front_camera":
+        front_camera_id = i
+        break
+
+    if front_camera_id is None:
+      warnings.warn("front_camera not found in model, using camera 0")
+      front_camera_id = 0
+    
+    self.renderer = BatchRenderer(
+        m=self._mjx_model,
+        gpu_id=self._config.vision_config.gpu_id,
+        num_worlds=1,  # Start with single environment for debugging
+        batch_render_view_width=self._config.vision_config.render_width,
+        batch_render_view_height=self._config.vision_config.render_height,
+        enabled_geom_groups=np.asarray(
+            self._config.vision_config.enabled_geom_groups
+        ),
+        enabled_cameras=np.asarray([front_camera_id]),
+        add_cam_debug_geo=False,
+        use_rasterizer=self._config.vision_config.use_rasterizer,
+        viz_gpu_hdls=viz_gpu_hdls,
+    )
 
   def reset(self, rng: jax.Array) -> mjx_env.State:
     qpos = self._init_q
@@ -220,6 +287,18 @@ class Joystick(go2_base.Go2Env):
     metrics["swing_peak"] = jp.zeros(())
 
     obs = self._get_obs(data, info)
+    
+    # Initialize vision if enabled
+    if self._vision and hasattr(self, 'renderer'):
+      render_token, rgb, _ = self.renderer.init(data, self._mjx_model)
+      info.update({"render_token": render_token})
+      # Convert RGBA to RGB and normalize
+      obs_img = rgb[0][..., :3].astype(jp.float32) / 255.0  # Use RGB channels
+      obs_history = jp.tile(obs_img, (self._config.vision_config.history, 1, 1, 1))
+      info.update({"obs_history": obs_history})
+      obs.update({"pixels/front_camera": obs_history.transpose(1, 2, 0, 3).reshape(
+          obs_history.shape[1], obs_history.shape[2], -1)})
+    
     reward, done = jp.zeros(2)
     return mjx_env.State(data, obs, reward, done, metrics, info)
 
@@ -253,6 +332,23 @@ class Joystick(go2_base.Go2Env):
     state.info["swing_peak"] = jp.maximum(state.info["swing_peak"], p_fz)
 
     obs = self._get_obs(data, state.info)
+    
+    # Update vision if enabled
+    if self._vision and hasattr(self, 'renderer') and "render_token" in state.info:
+      _, rgb, _ = self.renderer.render(state.info["render_token"], data)
+      # Convert RGBA to RGB and normalize
+      # Handle the batch dimension properly - squeeze out extra dimensions
+      obs_img = rgb[0][..., :3].astype(jp.float32) / 255.0
+      if obs_img.ndim == 4:  # If shape is (1, H, W, C), squeeze to (H, W, C)
+          obs_img = obs_img.squeeze(0)
+      # Update observation history (roll and add new frame)
+      obs_history = state.info["obs_history"]
+      obs_history = jp.roll(obs_history, 1, axis=0)
+      obs_history = obs_history.at[0].set(obs_img)
+      state.info["obs_history"] = obs_history
+      obs.update({"pixels/front_camera": obs_history.transpose(1, 2, 0, 3).reshape(
+          obs_history.shape[1], obs_history.shape[2], -1)})
+    
     done = self._get_termination(data)
 
     rewards = self._get_reward(

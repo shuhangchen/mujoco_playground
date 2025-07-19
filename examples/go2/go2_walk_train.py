@@ -162,7 +162,6 @@ checkpointer.save(checkpoint_path, params, save_args=save_args, force=True)
 print(f"Model saved to {checkpoint_path}")
 
 # Save the configuration and metadata for inference
-import json
 config_data = {
     'env_name': env_name,
     'ppo_params': convert_to_serializable(ppo_params),

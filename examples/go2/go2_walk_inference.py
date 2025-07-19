@@ -148,9 +148,6 @@ for i in range(env_cfg.episode_length):
       {k: v for k, v in state.metrics.items() if k.startswith("reward/")}
   )
   rollout.append(state)
-  print(f"{i}-th step state: {state}")
-  print(f"{i}-th step state.obs: {state.obs}")
-  print(f"{i}-th step ctrl: {ctrl}")
   swing_peak.append(state.info["swing_peak"])
   rewards.append(
       {k[7:]: v for k, v in state.metrics.items() if k.startswith("reward/")}
@@ -283,9 +280,6 @@ for i in range(1_400):
   act_rng, rng = jax.random.split(rng)
   ctrl, _ = jit_inference_fn(state.obs, act_rng)
   state = jit_step(state, ctrl)
-  print(f"{i}-th step state: {state}")
-  print(f"{i}-th step state.obs: {state.obs}")
-  print(f"{i}-th step ctrl: {ctrl}")
   rollout.append(state)
   swing_peak.append(state.info["swing_peak"])
   linvel.append(env.get_global_linvel(state.data))
